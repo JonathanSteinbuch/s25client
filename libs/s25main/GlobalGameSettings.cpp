@@ -115,6 +115,7 @@ void GlobalGameSettings::registerAllAddons()
 
     registerAddon(std::make_unique<AddonPeaceful>());
     registerAddon(std::make_unique<AddonDurableGeologistSigns>());
+    registerAddon(std::make_unique<AddonGameLength>());
 }
 
 void GlobalGameSettings::resetAddons()
