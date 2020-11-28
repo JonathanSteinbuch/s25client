@@ -768,7 +768,7 @@ void dskHostGame::Msg_MsgBoxResult(const unsigned msgbox_id, const MsgboxResult 
         {
             if(mbr == MSR_YES)
             {
-                gameLobby->getSettings().setSelection(AddonId::PEACEFUL, true);
+                gameLobby->getSettings().setSelection(AddonId::PEACEFULMODE, true);
                 if(gameLobby->getSettings().getSelection(AddonId::ECONOMY_MODE_GAME_LENGTH) == 0)
                     gameLobby->getSettings().setSelection(AddonId::ECONOMY_MODE_GAME_LENGTH, 5);
                 gameLobby->getSettings().setSelection(AddonId::NO_COINS_DEFAULT, true);
@@ -782,11 +782,11 @@ void dskHostGame::Msg_MsgBoxResult(const unsigned msgbox_id, const MsgboxResult 
             }
         }
         break;
-        case 11: // Peaceful Mode still active
+        case 11: // PEACEFULMODE Mode still active
         {
             if(mbr == MSR_YES)
             {
-                gameLobby->getSettings().setSelection(AddonId::PEACEFUL, false);
+                gameLobby->getSettings().setSelection(AddonId::PEACEFULMODE, false);
             } else if(mbr == MSR_NO)
             {
                 forceOptions = true;
@@ -1060,24 +1060,24 @@ bool dskHostGame::checkOptions()
     if(forceOptions)
         return true;
     const GlobalGameSettings& ggs = gameLobby->getSettings();
-    if(ggs.objective == GO_ECONOMYMODE && !ggs.getSelection(AddonId::PEACEFUL))
+    if(ggs.objective == GO_ECONOMYMODE && !ggs.getSelection(AddonId::PEACEFULMODE))
     {
-        WINDOWMANAGER.Show(
-          std::make_unique<iwMsgbox>(_("Economy Mode"),
-                                     _("You chose the economy mode. Would you like to adjust settings to fit, "
-                                       "especially to peaceful mode? Choosing yes will make the adjustmenst and let "
-                                       "you review them, choosing no will start the game."),
-                                     this, MSB_YESNOCANCEL, MSB_QUESTIONGREEN, 10));
+        WINDOWMANAGER.Show(std::make_unique<iwMsgbox>(
+          _("Economy Mode"),
+          _("You chose the economy mode. Would you like to adjust settings to fit, "
+            "especially to PEACEFULMODE mode? Choosing yes will make the adjustmenst and let "
+            "you review them, choosing no will start the game."),
+          this, MSB_YESNOCANCEL, MSB_QUESTIONGREEN, 10));
         return false;
-    } else if(ggs.getSelection(AddonId::PEACEFUL)
+    } else if(ggs.getSelection(AddonId::PEACEFULMODE)
               && (ggs.objective == GO_CONQUER3_4 || ggs.objective == GO_TOTALDOMINATION))
     {
-        WINDOWMANAGER.Show(
-          std::make_unique<iwMsgbox>(_("Peaceful Mode"),
-                                     _("You chose a war based victory condition but peaceful mode is still active. "
-                                       "Would you like to disactivate peaceful mode before you start? Choosing no will "
-                                       "start the game, yes will let you review the changes."),
-                                     this, MSB_YESNOCANCEL, MSB_QUESTIONRED, 11));
+        WINDOWMANAGER.Show(std::make_unique<iwMsgbox>(
+          _("PEACEFULMODE Mode"),
+          _("You chose a war based victory condition but PEACEFULMODE mode is still active. "
+            "Would you like to disactivate PEACEFULMODE mode before you start? Choosing no will "
+            "start the game, yes will let you review the changes."),
+          this, MSB_YESNOCANCEL, MSB_QUESTIONRED, 11));
         return false;
     }
     return true;

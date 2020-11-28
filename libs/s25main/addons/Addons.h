@@ -70,4 +70,4 @@
 
 #include "addons/AddonDurableGeologistSigns.h"
 #include "addons/AddonEconomyModeGameLength.h"
-#include "addons/AddonPeaceful.h"
+#include "addons/AddonPeacefulMode.h"
