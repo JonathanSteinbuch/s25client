@@ -17,26 +17,16 @@
 
 #pragma once
 
-#include "AddonList.h"
-#include <boost/format.hpp>
-
-const std::array<unsigned, 4> SUPPRESS_UNUSED signDurabilityFactor = {{1, 2, 4, 10}};
+#include "AddonBool.h"
 
 /**
- *  Addon makes resource signs stay visible longer than normal
+ *  Addon disables all attacks
  */
-class AddonDurableGeologistSigns : public AddonList
+class AddonPeacefulMode : public AddonBool
 {
 public:
-    AddonDurableGeologistSigns()
-        : AddonList(AddonId::DURABLE_GEOLOGIST_SIGNS, AddonGroup::Economy, _("Geologist sign durability"),
-                    _("Increase the durability of geologist signs by a factor."),
-                    {
-                      _("Default"),
-                      (boost::format(_("%1%x")) % signDurabilityFactor[1]).str(),
-                      (boost::format(_("%1%x")) % signDurabilityFactor[2]).str(),
-                      (boost::format(_("%1%x")) % signDurabilityFactor[3]).str(),
-                    },
-                    0)
+    AddonPeacefulMode()
+        : AddonBool(AddonId::PEACEFULMODE, AddonGroup::GamePlay | AddonGroup::Military, _("Peaceful"),
+                    _("Nobody can attack anyone."))
     {}
 };
