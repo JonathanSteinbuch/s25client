@@ -1045,12 +1045,12 @@ bool dskHostGame::checkOptions()
     if(ggs.getSelection(AddonId::PEACEFULMODE)
        && (ggs.objective == GO_CONQUER3_4 || ggs.objective == GO_TOTALDOMINATION))
     {
-        WINDOWMANAGER.Show(std::make_unique<iwMsgbox>(
-          _("peaceful Mode"),
-          _("You chose a war based victory condition but peaceful  mode is still active. "
-            "Would you like to disactivate peaceful  mode before you start? Choosing no will "
-            "start the game, yes will let you review the changes."),
-          this, MSB_YESNOCANCEL, MSB_QUESTIONRED, 11));
+        WINDOWMANAGER.Show(
+          std::make_unique<iwMsgbox>(_("Peaceful mode"),
+                                     _("You chose a war based victory condition but peaceful mode is still active. "
+                                       "Would you like to deactivate peaceful mode before you start? Choosing No will "
+                                       "start the game, Yes will let you review the changes."),
+                                     this, MSB_YESNOCANCEL, MSB_QUESTIONRED, 11));
         return false;
     }
     return true;
