@@ -1218,7 +1218,7 @@ void GameClient::ExecuteGameFrame()
 
     const unsigned curGF = GetGFNumber();
     // Is it time for the next GF? If we are skipping, it is always time for the next GF
-    if(skiptogf > curGF || (currentTime - framesinfo.lastTime) >= framesinfo.gf_length)
+    if(skiptogf > curGF || framesinfo.IsTimeForNextGF(currentTime))
     {
         try
         {

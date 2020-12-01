@@ -28,6 +28,12 @@ struct FramesInfo
     FramesInfo();
     void Clear();
 
+    /// Returns true if the time since the last game frame is long enough to get to the game frame length
+    bool IsTimeForNextGF(FramesInfo::UsedClock::time_point currentTime);
+
+    /// How late we were for the last game frame. Will be substracted from the next GF length in IsTimeForNext.
+    std::chrono::nanoseconds timeDelta_;
+
     /// Length of one GF in ms (~ 1/speed of the game)
     milliseconds32_t gf_length;
     /// Requested length of GF (for multiple changes between a NWF)

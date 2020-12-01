@@ -16,6 +16,7 @@
 // along with Return To The Roots. If not, see <http://www.gnu.org/licenses/>.
 
 #include "FramesInfo.h"
+#include "RTTR_Assert.h"
 
 FramesInfo::FramesInfo()
 {
@@ -30,7 +31,31 @@ void FramesInfo::Clear()
     nwf_length = 0;
     frameTime = milliseconds32_t::zero();
     lastTime = UsedClock::time_point();
+    timeDelta_ = milliseconds32_t::zero();
     isPaused = false;
+}
+
+bool FramesInfo::IsTimeForNextGF(FramesInfo::UsedClock::time_point currentTime)
+{
+    // Sometimes on the server the times get jumbled
+    if(lastTime > currentTime)
+        lastTime = currentTime;
+
+    bool isTime = timeDelta_ >= gf_length || (currentTime - lastTime) >= gf_length - timeDelta_;
+    if(isTime)
+    {
+        timeDelta_ = (currentTime - lastTime) - (gf_length - timeDelta_);
+
+        RTTR_Assert(timeDelta_ > std::chrono::milliseconds(0));
+
+        // Sometimes the timing get's messed up or we lag or have paused and we have to be resilient to that
+        if(timeDelta_ > milliseconds32_t(1000))
+        {
+            timeDelta_ = milliseconds32_t::zero();
+        }
+    }
+
+    return isTime;
 }
 
 FramesInfoClient::FramesInfoClient()
