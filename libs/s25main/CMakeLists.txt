@@ -1,6 +1,7 @@
 FIND_PACKAGE(BZip2 1.0.6 REQUIRED)
 gather_dll(BZIP2)
 FIND_PACKAGE(Boost 1.64.0 REQUIRED COMPONENTS filesystem iostreams locale)
+FIND_PACKAGE(Threads REQUIRED)
 
 SET(SOURCES_SUBDIRS )
 MACRO(AddDirectory dir)
@@ -59,6 +60,7 @@ target_link_libraries(s25Main PUBLIC
     driver
     Boost::filesystem Boost::disable_autolinking
     PRIVATE BZip2::BZip2 Boost::iostreams Boost::locale Boost::nowide samplerate_cpp
+    Threads::Threads
 )
 
 if(WIN32)

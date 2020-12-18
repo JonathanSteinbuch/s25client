@@ -18,12 +18,13 @@
 #pragma once
 
 #include "s25util/Singleton.h"
+#include <atomic>
 
 /// Klasse für alle "globalen" Variablen/Objekte
 class GlobalVars : public Singleton<GlobalVars>
 {
 public:
-    bool notdone = true;
+    std::atomic_bool notdone{true};
 };
 
 ///////////////////////////////////////////////////////////////////////////////

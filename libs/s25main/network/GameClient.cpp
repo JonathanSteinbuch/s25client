@@ -1373,9 +1373,9 @@ void GameClient::OnGameStart()
     if(state == CS_LOADED)
     {
         GAMEMANAGER.ResetAverageGFPS();
-        GAMEMANAGER.StartGameThread();
         framesinfo.lastTime = FramesInfo::UsedClock::now();
         state = CS_GAME;
+        GAMEMANAGER.StartGameThread();
         if(ci)
             ci->CI_GameStarted(game);
     } else if(state == CS_GAME && !game->IsStarted())
@@ -1763,8 +1763,9 @@ void GameClient::RequestSwapToPlayer(const unsigned char newId)
 
 void GameClient::UpdateFrameTime()
 {
-      auto frameTime = std::chrono::duration_cast<FramesInfo::milliseconds32_t>(FramesInfo::UsedClock::now() - framesinfo.lastTime);
-      framesinfo.frameTime = min(frameTime, framesinfo.gf_length-FramesInfo::milliseconds32_t(1));
+    auto frameTime =
+      std::chrono::duration_cast<FramesInfo::milliseconds32_t>(FramesInfo::UsedClock::now() - framesinfo.lastTime);
+    framesinfo.frameTime = min(frameTime, framesinfo.gf_length - FramesInfo::milliseconds32_t(1));
 }
 
 void GameClient::sleepTillNextFrame()
