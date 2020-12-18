@@ -1218,7 +1218,7 @@ void GameClient::ExecuteGameFrame()
 
     const unsigned curGF = GetGFNumber();
     // Is it time for the next GF? If we are skipping, it is always time for the next GF
-    if(skiptogf > curGF || (currentTime - framesinfo.lastTime) >= framesinfo.gf_length)
+    if(skiptogf > curGF || framesinfo.IsTimeForNextGF(currentTime))
     {
         try
         {
@@ -1708,7 +1708,7 @@ std::string GameClient::FormatGFTime(const unsigned gf) const
     // Angaben rausfiltern
     hours numHours = duration_cast<hours>(numSeconds);
     numSeconds -= numHours;
-    minutes numMinutes = duration_cast<hours>(numSeconds);
+    minutes numMinutes = duration_cast<minutes>(numSeconds);
     numSeconds -= numMinutes;
 
     // ganze Stunden mit dabei? Dann entsprechend anderes format, ansonsten ignorieren wir die einfach
