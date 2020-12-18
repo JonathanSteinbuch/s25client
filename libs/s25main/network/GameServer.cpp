@@ -293,8 +293,8 @@ void GameServer::Run()
         RunStateConfig();
     else if(state == SS_LOADING)
         RunStateLoading();
-    else if(state == SS_GAME)
-        RunStateGame();
+    /* else if(state == SS_GAME) This case now being handled by gameThread
+       RunStateGame();*/
 
     // post zustellen
     FillPlayerQueues();

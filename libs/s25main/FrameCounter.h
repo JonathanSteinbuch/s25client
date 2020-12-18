@@ -18,6 +18,7 @@
 #pragma once
 
 #include <chrono>
+#include <mutex>
 
 /// Class for keeping track of the number of frames passed
 /// Updates frame rate in specified intervalls (e.g. once per second),
@@ -66,11 +67,14 @@ private:
     /// How many frames to lag behind before adjusting
     unsigned maxLagFrames_;
 
+    std::mutex myMutex;
+
 public:
     FrameTimer(int targetFramerate = 60, unsigned maxLagFrames = 60, clock::time_point curTime = clock::now());
     void setTargetFramerate(int targetFramerate);
+    void setTargetFrameDuration(duration_t targetFrameDuration);
     /// Return time till next frame should be drawn
-    duration_t calcTimeToNextFrame(clock::time_point curTime = clock::now()) const;
+    duration_t calcTimeToNextFrame(clock::time_point curTime = clock::now());
     /// Update state when frame is drawn
     void update(clock::time_point curTime = clock::now());
 };
@@ -80,11 +84,14 @@ class FrameLimiter
     FrameTimer frameTimer_;
 
 public:
-    using clock = FrameTimer::clock;
+    /// Clock used. Same as FrameCounter
+    using clock = FrameCounter::clock;
+    /// Resolution of the time between frames. Uses Clocks duration
+    using duration_t = clock::duration;
     FrameLimiter();
-    explicit FrameLimiter(FrameTimer frameTimer);
     void setTargetFramerate(int targetFramerate);
+    void setTargetFrameDuration(duration_t targetFrameDuration);
     /// Update state when frame is drawn
     void update(clock::time_point curTime = clock::now());
-    void sleepTillNextFrame(clock::time_point curTime);
+    void sleepTillNextFrame(clock::time_point curTime = clock::now());
 };

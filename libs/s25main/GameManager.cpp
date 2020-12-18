@@ -106,16 +106,20 @@ void GameManager::Stop()
  */
 bool GameManager::Run()
 {
+    gameDataMutex_.lock();
     // Nachrichtenschleife
     if(!videoDriver_.Run())
         GLOBALVARS.notdone = false;
 
     LOBBYCLIENT.Run();
 
-    // Get this before the run so we know if we are currently skipping
-    const unsigned targetSkipGF = GAMECLIENT.skiptogf;
     GAMECLIENT.Run();
     GAMESERVER.Run();
+
+    // Get this before the run so we know if we are currently skipping
+    const unsigned targetSkipGF = GAMECLIENT.GetTargetSkipGF();
+
+    GAMECLIENT.UpdateFrameTime();
 
     if(targetSkipGF)
     {
@@ -141,7 +145,7 @@ bool GameManager::Run()
         } else
         {
             // Jump just completed
-            RTTR_Assert(!GAMECLIENT.skiptogf);
+            RTTR_Assert(!GAMECLIENT.GetTargetSkipGF());
             if(lastSkipReport)
             {
                 const auto timeDiff = static_cast<double>(current_time - lastSkipReport->time);
@@ -156,15 +160,20 @@ bool GameManager::Run()
         }
     } else
     {
-        videoDriver_.ClearScreen();
         windowManager_.Draw();
-        videoDriver_.SwapBuffers();
     }
     gfCounter_.update();
 
-    // Fenstermanager aufräumen
+    gameDataMutex_.unlock();
+
     if(!GLOBALVARS.notdone)
+    {
+        gameThread_.join();
         windowManager_.CleanUp();
+    }
+
+    videoDriver_.SwapBuffers();
+    videoDriver_.ClearScreen();
 
     return GLOBALVARS.notdone;
 }
@@ -203,6 +212,36 @@ bool GameManager::ShowMenu()
 void GameManager::ResetAverageGFPS()
 {
     gfCounter_ = FrameCounter(FrameCounter::clock::duration::max()); // Never update
+}
+
+void GameManager::StartGameThread()
+{
+    // Check if the drawing thread has started yet. If not, start it
+    if(!gameThread_.joinable())
+    {
+        gameThread_ = std::thread(&GameManager::GameLoop, this);
+    }
+}
+
+void GameManager::JoinGameThread()
+{
+    if(gameThread_.joinable())
+    {
+        gameThread_.join();
+    }
+}
+
+void GameManager::GameLoop()
+{
+    while(GAMECLIENT.GetState() == GAMECLIENT.CS_GAME)
+    {
+        GAMECLIENT.sleepTillNextFrame();
+
+        gameDataMutex_.lock();
+        GAMECLIENT.ExecuteGameFrame();
+        GAMESERVER.ExecuteGameFrame();
+        gameDataMutex_.unlock();
+    }
 }
 
 static GameManager* globalGameManager = nullptr;

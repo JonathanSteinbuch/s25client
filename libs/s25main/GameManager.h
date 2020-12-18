@@ -19,6 +19,8 @@
 
 #include "FrameCounter.h"
 #include <boost/optional.hpp>
+#include <mutex>
+#include <thread>
 
 class Log;
 class Settings;
@@ -45,6 +47,8 @@ public:
     unsigned GetNumFrames() { return gfCounter_.getCurNumFrames(); }
     unsigned GetAverageGFPS() { return gfCounter_.getCurFrameRate(); }
 
+    void StartGameThread();
+    void JoinGameThread();
 private:
     bool ShowSplashscreen();
 
@@ -60,6 +64,14 @@ private:
         unsigned time, gf;
     };
     boost::optional<SkipReport> lastSkipReport;
+
+    ///Thread for game update operations (separate in case of hardware vSync)
+    std::thread gameThread_;
+
+    void GameLoop();
+
+    ///Locks all data to current thread
+    std::mutex gameDataMutex_;
 };
 
 GameManager& getGlobalGameManager();

@@ -51,6 +51,7 @@ struct PlayerGameCommands;
 class NWFInfo;
 struct CreateServerInfo;
 struct ReplayInfo;
+class FrameLimiter;
 
 class GameClient final :
     public Singleton<GameClient, SingletonPolicies::WithLongevity>,
@@ -121,6 +122,7 @@ public:
     FramesInfo::milliseconds32_t GetGFLength() const { return framesinfo.gf_length; }
     unsigned GetNWFLength() const { return framesinfo.nwf_length; }
     FramesInfo::milliseconds32_t GetFrameTime() const { return framesinfo.frameTime; }
+    void UpdateFrameTime();
     unsigned GetGlobalAnimation(unsigned short max, unsigned char factor_numerator, unsigned char factor_denumerator,
                                 unsigned offset);
     unsigned Interpolate(unsigned max_val, const GameEvent* ev);
@@ -152,6 +154,8 @@ public:
     /// Wandelt eine GF-Angabe in eine Zeitangabe um (HH:MM:SS oder MM:SS wenn Stunden = 0)
     std::string FormatGFTime(unsigned gf) const override;
 
+    void sleepTillNextFrame();
+
     /// Gibt Replay-Dateiname zurück
     const boost::filesystem::path& GetReplayFilename() const;
     /// Wird ein Replay abgespielt?
@@ -160,7 +164,10 @@ public:
     /// Is tournament mode activated (0 if not)? Returns the durations of the tournament mode in gf otherwise
     unsigned GetTournamentModeDuration() const;
 
-    void SkipGF(unsigned gf, GameWorldView& gwv);
+    void SkipGF(unsigned gf);
+
+    /// Versucht einen neuen GameFrame auszuführen, falls die Zeit dafür gekommen ist
+    void ExecuteGameFrame();
 
     /// Changes the player ingame (for replay or debugging)
     void ChangePlayerIngame(unsigned char playerId1, unsigned char playerId2);
@@ -180,6 +187,8 @@ public:
 
     NetworkPlayer& GetMainPlayer() { return mainPlayer; }
 
+    unsigned GetTargetSkipGF() const { return skiptogf; }
+
 private:
     /// Create an AI player for the current world
     std::unique_ptr<AIPlayer> CreateAIPlayer(unsigned playerId, const AI::Info& aiInfo);
@@ -191,8 +200,7 @@ private:
     /// Liefert einen Player zurück
     GamePlayer& GetPlayer(unsigned id);
 
-    /// Versucht einen neuen GameFrame auszuführen, falls die Zeit dafür gekommen ist
-    void ExecuteGameFrame();
+
     void ExecuteGameFrame_Replay();
     void ExecuteNWF();
     /// Filtert aus einem Network-Command-Paket alle Commands aus und führt sie aus, falls ein Spielerwechsel-Command
@@ -265,10 +273,14 @@ public:
     /// verstecken
     // TODO: Move to viewer
     VisualSettings visual_settings, default_settings; //-V730_NOINIT
+
+private:
     /// skip ahead how many gf?
     unsigned skiptogf;
 
-private:
+    unsigned skipStartGF_;
+    unsigned skipStartTicks_;
+
     NetworkPlayer mainPlayer;
 
     ClientState state;
@@ -297,6 +309,8 @@ private:
     MapInfo mapinfo;
 
     FramesInfoClient framesinfo;
+
+    std::unique_ptr<FrameLimiter> frameLimiter_;
 
     ClientInterface* ci;
 

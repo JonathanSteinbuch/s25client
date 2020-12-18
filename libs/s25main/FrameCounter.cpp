@@ -61,17 +61,29 @@ FrameTimer::FrameTimer(int targetFramerate, unsigned maxLagFrames, clock::time_p
 void FrameTimer::setTargetFramerate(int targetFramerate)
 {
     using namespace std::chrono;
-    nextFrameTime_ -= targetFrameDuration_;
+    duration_t targetFrameDuration;
     if(targetFramerate <= 0)
-        targetFrameDuration_ = duration_t::zero(); // Disabled
+        targetFrameDuration = duration_t::zero(); // Disabled
     else
-        targetFrameDuration_ = duration_cast<duration_t>(seconds(1)) / std::min(targetFramerate, 200); // Max 200FPS
+        targetFrameDuration = duration_cast<duration_t>(seconds(1)) / std::min(targetFramerate, 200); // Max 200FPS
+    setTargetFrameDuration(targetFrameDuration);
+}
+
+void FrameTimer::setTargetFrameDuration(duration_t targetFrameDuration)
+{
+    using namespace std::chrono;
+    const std::lock_guard<std::mutex> lock(myMutex);
+
+    nextFrameTime_ -= targetFrameDuration_;
+    targetFrameDuration_ = targetFrameDuration;
     nextFrameTime_ += targetFrameDuration_;
 }
 
-FrameTimer::duration_t FrameTimer::calcTimeToNextFrame(clock::time_point curTime) const
+FrameTimer::duration_t FrameTimer::calcTimeToNextFrame(clock::time_point curTime)
 {
     using namespace std::chrono;
+    const std::lock_guard<std::mutex> lock(myMutex);
+
     if(targetFrameDuration_ == duration_t::zero())
         return clock::duration::zero();
 
@@ -83,6 +95,7 @@ FrameTimer::duration_t FrameTimer::calcTimeToNextFrame(clock::time_point curTime
 
 void FrameTimer::update(clock::time_point curTime)
 {
+   const std::lock_guard<std::mutex> lock(myMutex);
     // Ideal: nextFrameTime == curTime -> Current frame is punctual
     // Normal: nextFrameTime + x == curTime; -targetFrameDuration < x < targetFrameDuration (1 frame early to 1 frame
     // late) Problem: The calculations can take long so every frame is late making nextFrameTime_ be further and further
@@ -99,11 +112,14 @@ void FrameTimer::update(clock::time_point curTime)
 
 FrameLimiter::FrameLimiter() = default;
 
-FrameLimiter::FrameLimiter(FrameTimer frameTimer) : frameTimer_(frameTimer) {}
-
 void FrameLimiter::setTargetFramerate(int targetFramerate)
 {
     frameTimer_.setTargetFramerate(targetFramerate);
+}
+
+void FrameLimiter::setTargetFrameDuration(duration_t targetFrameDuration)
+{
+    frameTimer_.setTargetFrameDuration(targetFrameDuration);
 }
 
 void FrameLimiter::update(clock::time_point curTime)
@@ -116,8 +132,8 @@ void FrameLimiter::sleepTillNextFrame(clock::time_point curTime)
     using namespace std::chrono;
     nanoseconds waitTime = duration_cast<nanoseconds>(frameTimer_.calcTimeToNextFrame(curTime));
     // No time to waste?
-    if(waitTime <= nanoseconds::zero())
-        return;
+    if(waitTime <= nanoseconds(100))
+        waitTime = nanoseconds(100); //Wait a minimal amount of time to give other threads a chance
 #ifdef _WIN32
     if(waitTime < milliseconds(13)) // timer resolutions < 13ms do not work for windows correctly. TODO: Still true?
         return;

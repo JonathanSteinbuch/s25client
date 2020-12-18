@@ -18,6 +18,7 @@
 #include "GameClient.h"
 #include "CreateServerInfo.h"
 #include "EventManager.h"
+#include "FrameCounter.h"
 #include "Game.h"
 #include "GameEvent.h"
 #include "GameLobby.h"
@@ -74,7 +75,10 @@ void GameClient::ClientConfig::Clear()
     isHost = false;
 }
 
-GameClient::GameClient() : skiptogf(0), mainPlayer(0), state(CS_STOPPED), ci(nullptr), replayMode(false) {}
+GameClient::GameClient()
+    : skiptogf(0), mainPlayer(0), state(CS_STOPPED), frameLimiter_(std::make_unique<FrameLimiter>()), ci(nullptr),
+      replayMode(false)
+{}
 
 GameClient::~GameClient()
 {
@@ -178,8 +182,8 @@ void GameClient::Run()
         // All players ready?
         if(nwfInfo->isReady())
             OnGameStart();
-    } else if(state == CS_GAME)
-        ExecuteGameFrame();
+    } /*else if(state == CS_GAME) This case now being handled by gameThread
+        ExecuteGameFrame();*/
 
     // maximal 10 Pakete verschicken
     mainPlayer.sendMsgs(10);
@@ -223,6 +227,7 @@ void GameClient::Stop()
     RTTR_Assert(!gameLobby);
 
     state = CS_STOPPED;
+    GAMEMANAGER.JoinGameThread();
     LOG.write("client state changed to stop\n");
 }
 
@@ -261,6 +266,8 @@ void GameClient::StartGame(const unsigned random_init)
     // Je nach Geschwindigkeit GF-Länge einstellen
     framesinfo.gf_length = FramesInfo::milliseconds32_t(SPEED_GF_LENGTHS[gameLobby->getSettings().speed]);
     framesinfo.gfLengthReq = framesinfo.gf_length;
+
+    frameLimiter_->setTargetFrameDuration(framesinfo.gf_length);
 
     // Random-Generator initialisieren
     RANDOM.Init(random_init);
@@ -1101,6 +1108,8 @@ void GameClient::IncreaseSpeed()
         framesinfo.gf_length = framesinfo.gfLengthReq;
     else
         mainPlayer.sendMsgAsync(new GameMessage_Speed(framesinfo.gfLengthReq.count()));
+
+    frameLimiter_->setTargetFrameDuration(framesinfo.gf_length);
 }
 
 void GameClient::DecreaseSpeed()
@@ -1125,6 +1134,8 @@ void GameClient::DecreaseSpeed()
         framesinfo.gf_length = framesinfo.gfLengthReq;
     else
         mainPlayer.sendMsgAsync(new GameMessage_Speed(framesinfo.gfLengthReq.count()));
+
+    frameLimiter_->setTargetFrameDuration(framesinfo.gf_length);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1217,80 +1228,97 @@ void GameClient::ExecuteGameFrame()
     }
 
     const unsigned curGF = GetGFNumber();
-    // Is it time for the next GF? If we are skipping, it is always time for the next GF
-    if(skiptogf > curGF || (currentTime - framesinfo.lastTime) >= framesinfo.gf_length)
+
+    try
     {
-        try
+        if(replayMode)
         {
-            if(replayMode)
+            // In replay mode we have all commands in the file -> Execute them
+            ExecuteGameFrame_Replay();
+
+            if(skiptogf)
             {
-                // In replay mode we have all commands in the file -> Execute them
-                ExecuteGameFrame_Replay();
-            } else
-            {
-                RTTR_Assert(curGF <= nwfInfo->getNextNWF());
-                bool isNWF = (curGF == nwfInfo->getNextNWF());
-                // Is it time for a NWF, handle that first
-                if(isNWF)
+                if(skiptogf == curGF)
                 {
-                    // If a player is lagging (we did not got his commands) "pause" the game by skipping the rest of
-                    // this function
-                    // -> Don't execute GF, don't autosave etc.
-                    if(!nwfInfo->isReady())
-                    {
-                        // If a player is a few GFs behind, he will never catch up and always lag
-                        // Hence, pause up to 4 GFs randomly before trying again to execute this NWF
-                        // Do not reset frameTime or lastTime as this will mess up interpolation for drawing
-                        framesinfo.forcePauseStart = currentTime;
-                        framesinfo.forcePauseLen = (rand() * 4 * framesinfo.gf_length) / RAND_MAX;
-                        return;
-                    }
-
-                    RTTR_Assert(nwfInfo->getServerInfo().gf == curGF);
-
-                    ExecuteNWF();
-
-                    FramesInfo::milliseconds32_t oldGFLen = framesinfo.gf_length;
-                    nwfInfo->execute(framesinfo);
-                    if(oldGFLen != framesinfo.gf_length)
-                    {
-                        LOG.write("Client: Speed changed at %1% from %2% to %3% (NWF: %4%)\n") % curGF % oldGFLen
-                          % framesinfo.gf_length % framesinfo.nwf_length;
-                    }
+                    // pause game and write out how long this took
+                    unsigned ticks = VIDEODRIVER.GetTickCount() - skipStartTicks_;
+                    boost::format text(_("Jump finished (%1$.3g seconds)."));
+                    text % (ticks / 1000.0);
+                    SystemChat(text.str());
+                    SetPause(true);
+                } else if(replayMode && (curGF - skipStartGF_) % 1000 == 0)
+                {
+                    // write out update notice
+                    boost::format nwfString(_("current GF: %u - still fast forwarding: %d GFs left (%d %%)"));
+                    nwfString % curGF % (skiptogf - curGF) % ((curGF - skipStartGF_) * 100 / (skiptogf - skipStartGF_));
+                    SystemChat(nwfString.str());
+                }
+            }
+        } else
+        {
+            RTTR_Assert(curGF <= nwfInfo->getNextNWF());
+            bool isNWF = (curGF == nwfInfo->getNextNWF());
+            // Is it time for a NWF, handle that first
+            if(isNWF)
+            {
+                // If a player is lagging (we did not got his commands) "pause" the game by skipping the rest of
+                // this function
+                // -> Don't execute GF, don't autosave etc.
+                if(!nwfInfo->isReady())
+                {
+                    // If a player is a few GFs behind, he will never catch up and always lag
+                    // Hence, pause up to 4 GFs randomly before trying again to execute this NWF
+                    // Do not reset frameTime or lastTime as this will mess up interpolation for drawing
+                    framesinfo.forcePauseStart = currentTime;
+                    framesinfo.forcePauseLen = (rand() * 4 * framesinfo.gf_length) / RAND_MAX;
+                    return;
                 }
 
-                NextGF(isNWF);
-                RTTR_Assert(curGF <= nwfInfo->getNextNWF());
-                HandleAutosave();
+                RTTR_Assert(nwfInfo->getServerInfo().gf == curGF);
 
-                // GF-Ende im Replay aktualisieren
-                if(replayinfo && replayinfo->replay.IsRecording())
-                    replayinfo->replay.UpdateLastGF(curGF);
+                ExecuteNWF();
+
+                FramesInfo::milliseconds32_t oldGFLen = framesinfo.gf_length;
+                nwfInfo->execute(framesinfo);
+                if(oldGFLen != framesinfo.gf_length)
+                {
+                    LOG.write("Client: Speed changed at %1% from %2% to %3% (NWF: %4%)\n") % curGF % oldGFLen
+                      % framesinfo.gf_length % framesinfo.nwf_length;
+                }
             }
 
-            // Store this timestamp
-            framesinfo.lastTime = currentTime;
-            // Reset frameTime
-            framesinfo.frameTime = FramesInfo::milliseconds32_t::zero();
-        } catch(LuaExecutionError& e)
-        {
-            if(ci)
-            {
-                SystemChat(
-                  (boost::format(_("Error during execution of lua script: %1\nGame stopped!")) % e.what()).str());
-                ci->CI_Error(CE_INVALID_MAP);
-            }
-            Stop();
+            NextGF(isNWF);
+            RTTR_Assert(curGF <= nwfInfo->getNextNWF());
+            HandleAutosave();
+
+            // GF-Ende im Replay aktualisieren
+            if(replayinfo && replayinfo->replay.IsRecording())
+                replayinfo->replay.UpdateLastGF(curGF);
         }
-        if(skiptogf == GetGFNumber())
-            skiptogf = 0;
-    } else
+
+        // Store this timestamp
+        framesinfo.lastTime = currentTime;
+        // Reset frameTime
+        framesinfo.frameTime = FramesInfo::milliseconds32_t::zero();
+    } catch(LuaExecutionError& e)
     {
-        // Next GF not yet reached, just update the time in the current one for drawing
-        framesinfo.frameTime =
-          std::chrono::duration_cast<FramesInfo::milliseconds32_t>(currentTime - framesinfo.lastTime);
-        RTTR_Assert(framesinfo.frameTime < framesinfo.gf_length);
+        if(ci)
+        {
+            SystemChat((boost::format(_("Error during execution of lua script: %1\nGame stopped!")) % e.what()).str());
+            ci->CI_Error(CE_INVALID_MAP);
+        }
+        Stop();
     }
+
+    if(skiptogf == GetGFNumber())
+    {
+        skiptogf = 0;
+
+        frameLimiter_->setTargetFrameDuration(framesinfo.gf_length);
+        VIDEODRIVER.setTargetFramerate(SETTINGS.video.vsync);
+    }
+
+    frameLimiter_->update(currentTime);
 }
 
 void GameClient::HandleAutosave()
@@ -1345,6 +1373,7 @@ void GameClient::OnGameStart()
     if(state == CS_LOADED)
     {
         GAMEMANAGER.ResetAverageGFPS();
+        GAMEMANAGER.StartGameThread();
         framesinfo.lastTime = FramesInfo::UsedClock::now();
         state = CS_GAME;
         if(ci)
@@ -1528,52 +1557,20 @@ void GameClient::ServerLost()
  *
  *  @param[in] dest_gf Zielgameframe
  */
-void GameClient::SkipGF(unsigned gf, GameWorldView& gwv)
+void GameClient::SkipGF(unsigned gf)
 {
     if(gf <= GetGFNumber())
         return;
 
-    unsigned start_ticks = VIDEODRIVER.GetTickCount();
+    skipStartTicks_ = VIDEODRIVER.GetTickCount();
+    skipStartGF_ = GetGFNumber();
 
-    if(!replayMode)
-    {
-        // unpause before skipping
-        SetPause(false);
-        mainPlayer.sendMsgAsync(new GameMessage_SkipToGF(gf));
-        return;
-    }
-
+    // unpause before skipping
     SetPause(false);
+    mainPlayer.sendMsgAsync(new GameMessage_SkipToGF(gf));
     skiptogf = gf;
-
-    // GFs überspringen
-    for(unsigned i = GetGFNumber(); i < skiptogf; ++i)
-    {
-        if(i % 1000 == 0)
-        {
-            RoadBuildState road;
-            road.mode = RM_DISABLED;
-
-            // spiel aktualisieren
-            gwv.Draw(road, MapPoint::Invalid(), false);
-
-            // text oben noch hinschreiben
-            boost::format nwfString(_("current GF: %u - still fast forwarding: %d GFs left (%d %%)"));
-            nwfString % GetGFNumber() % (gf - i) % (i * 100 / gf);
-            LargeFont->Draw(DrawPoint(VIDEODRIVER.GetRenderSize() / 2u), nwfString.str(), FontStyle::CENTER,
-                            COLOR_YELLOW);
-
-            VIDEODRIVER.SwapBuffers();
-        }
-        ExecuteGameFrame();
-    }
-
-    // Spiel pausieren & text ausgabe wie lang das jetzt gedauert hat
-    unsigned ticks = VIDEODRIVER.GetTickCount() - start_ticks;
-    boost::format text(_("Jump finished (%1$.3g seconds)."));
-    text % (ticks / 1000.0);
-    SystemChat(text.str());
-    SetPause(true);
+    frameLimiter_->setTargetFrameDuration(FrameLimiter::duration_t::zero());
+    VIDEODRIVER.setTargetFramerate(1);
 }
 
 void GameClient::SystemChat(const std::string& text)
@@ -1708,7 +1705,7 @@ std::string GameClient::FormatGFTime(const unsigned gf) const
     // Angaben rausfiltern
     hours numHours = duration_cast<hours>(numSeconds);
     numSeconds -= numHours;
-    minutes numMinutes = duration_cast<hours>(numSeconds);
+    minutes numMinutes = duration_cast<minutes>(numSeconds);
     numSeconds -= numMinutes;
 
     // ganze Stunden mit dabei? Dann entsprechend anderes format, ansonsten ignorieren wir die einfach
@@ -1762,4 +1759,15 @@ void GameClient::RequestSwapToPlayer(const unsigned char newId)
     GamePlayer& player = GetPlayer(newId);
     if(player.ps == PS_AI && player.aiInfo.type == AI::DUMMY)
         mainPlayer.sendMsgAsync(new GameMessage_Player_Swap(0xFF, newId));
+}
+
+void GameClient::UpdateFrameTime()
+{
+      auto frameTime = std::chrono::duration_cast<FramesInfo::milliseconds32_t>(FramesInfo::UsedClock::now() - framesinfo.lastTime);
+      framesinfo.frameTime = min(frameTime, framesinfo.gf_length-FramesInfo::milliseconds32_t(1));
+}
+
+void GameClient::sleepTillNextFrame()
+{
+    frameLimiter_->sleepTillNextFrame();
 }

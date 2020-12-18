@@ -42,7 +42,7 @@ iwSkipGFs::iwSkipGFs(GameWorldView& gwv)
 void iwSkipGFs::SkipGFs()
 {
     int gf = s25util::fromStringClassicDef(GetCtrl<ctrlEdit>(1)->GetText(), 0);
-    GAMECLIENT.SkipGF(gf, gwv);
+    GAMECLIENT.SkipGF(gf);
 }
 
 void iwSkipGFs::Msg_ButtonClick(const unsigned /*ctrl_id*/)

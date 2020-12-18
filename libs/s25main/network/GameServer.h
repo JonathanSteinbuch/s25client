@@ -62,6 +62,9 @@ public:
 
     void Stop();
 
+    /// Handles advancing of GFs, actions of AI and potentially the NWF
+    void ExecuteGameFrame();
+
 private:
     bool StartGame();
 
@@ -125,9 +128,7 @@ private:
     /// Sends a notification to all players if the color was changed
     void CheckAndSetColor(unsigned playerIdx, unsigned newColor);
 
-    /// Handles advancing of GFs, actions of AI and potentially the NWF
-    void ExecuteGameFrame();
-    void ExecuteNWF();
+ void ExecuteNWF();
 
     bool CheckForAsync();
     boost::filesystem::path SaveAsyncLog();
