@@ -1217,80 +1217,69 @@ void GameClient::ExecuteGameFrame()
     }
 
     const unsigned curGF = GetGFNumber();
-    // Is it time for the next GF? If we are skipping, it is always time for the next GF
-    if(skiptogf > curGF || (currentTime - framesinfo.lastTime) >= framesinfo.gf_length)
+    try
     {
-        try
+        if(replayMode)
         {
-            if(replayMode)
+            // In replay mode we have all commands in the file -> Execute them
+            ExecuteGameFrame_Replay();
+        } else
+        {
+            RTTR_Assert(curGF <= nwfInfo->getNextNWF());
+            bool isNWF = (curGF == nwfInfo->getNextNWF());
+            // Is it time for a NWF, handle that first
+            if(isNWF)
             {
-                // In replay mode we have all commands in the file -> Execute them
-                ExecuteGameFrame_Replay();
-            } else
-            {
-                RTTR_Assert(curGF <= nwfInfo->getNextNWF());
-                bool isNWF = (curGF == nwfInfo->getNextNWF());
-                // Is it time for a NWF, handle that first
-                if(isNWF)
+                // If a player is lagging (we did not got his commands) "pause" the game by skipping the rest of
+                // this function
+                // -> Don't execute GF, don't autosave etc.
+                if(!nwfInfo->isReady())
                 {
-                    // If a player is lagging (we did not got his commands) "pause" the game by skipping the rest of
-                    // this function
-                    // -> Don't execute GF, don't autosave etc.
-                    if(!nwfInfo->isReady())
-                    {
-                        // If a player is a few GFs behind, he will never catch up and always lag
-                        // Hence, pause up to 4 GFs randomly before trying again to execute this NWF
-                        // Do not reset frameTime or lastTime as this will mess up interpolation for drawing
-                        framesinfo.forcePauseStart = currentTime;
-                        framesinfo.forcePauseLen = (rand() * 4 * framesinfo.gf_length) / RAND_MAX;
-                        return;
-                    }
-
-                    RTTR_Assert(nwfInfo->getServerInfo().gf == curGF);
-
-                    ExecuteNWF();
-
-                    FramesInfo::milliseconds32_t oldGFLen = framesinfo.gf_length;
-                    nwfInfo->execute(framesinfo);
-                    if(oldGFLen != framesinfo.gf_length)
-                    {
-                        LOG.write("Client: Speed changed at %1% from %2% to %3% (NWF: %4%)\n") % curGF % oldGFLen
-                          % framesinfo.gf_length % framesinfo.nwf_length;
-                    }
+                    // If a player is a few GFs behind, he will never catch up and always lag
+                    // Hence, pause up to 4 GFs randomly before trying again to execute this NWF
+                    // Do not reset frameTime or lastTime as this will mess up interpolation for drawing
+                    framesinfo.forcePauseStart = currentTime;
+                    framesinfo.forcePauseLen = (rand() * 4 * framesinfo.gf_length) / RAND_MAX;
+                    return;
                 }
 
-                NextGF(isNWF);
-                RTTR_Assert(curGF <= nwfInfo->getNextNWF());
-                HandleAutosave();
+                RTTR_Assert(nwfInfo->getServerInfo().gf == curGF);
 
-                // GF-Ende im Replay aktualisieren
-                if(replayinfo && replayinfo->replay.IsRecording())
-                    replayinfo->replay.UpdateLastGF(curGF);
+                ExecuteNWF();
+
+                FramesInfo::milliseconds32_t oldGFLen = framesinfo.gf_length;
+                nwfInfo->execute(framesinfo);
+                if(oldGFLen != framesinfo.gf_length)
+                {
+                    LOG.write("Client: Speed changed at %1% from %2% to %3% (NWF: %4%)\n") % curGF % oldGFLen
+                      % framesinfo.gf_length % framesinfo.nwf_length;
+                }
             }
 
-            // Store this timestamp
-            framesinfo.lastTime = currentTime;
-            // Reset frameTime
-            framesinfo.frameTime = FramesInfo::milliseconds32_t::zero();
-        } catch(LuaExecutionError& e)
-        {
-            if(ci)
-            {
-                SystemChat(
-                  (boost::format(_("Error during execution of lua script: %1\nGame stopped!")) % e.what()).str());
-                ci->CI_Error(CE_INVALID_MAP);
-            }
-            Stop();
+            NextGF(isNWF);
+            RTTR_Assert(curGF <= nwfInfo->getNextNWF());
+            HandleAutosave();
+
+            // GF-Ende im Replay aktualisieren
+            if(replayinfo && replayinfo->replay.IsRecording())
+                replayinfo->replay.UpdateLastGF(curGF);
         }
-        if(skiptogf == GetGFNumber())
-            skiptogf = 0;
-    } else
+
+        // Store this timestamp
+        framesinfo.lastTime = currentTime;
+        // Reset frameTime
+        framesinfo.frameTime = FramesInfo::milliseconds32_t::zero();
+    } catch(LuaExecutionError& e)
     {
-        // Next GF not yet reached, just update the time in the current one for drawing
-        framesinfo.frameTime =
-          std::chrono::duration_cast<FramesInfo::milliseconds32_t>(currentTime - framesinfo.lastTime);
-        RTTR_Assert(framesinfo.frameTime < framesinfo.gf_length);
+        if(ci)
+        {
+            SystemChat((boost::format(_("Error during execution of lua script: %1\nGame stopped!")) % e.what()).str());
+            ci->CI_Error(CE_INVALID_MAP);
+        }
+        Stop();
     }
+    if(skiptogf == GetGFNumber())
+        skiptogf = 0;
 }
 
 void GameClient::HandleAutosave()
@@ -1762,4 +1751,11 @@ void GameClient::RequestSwapToPlayer(const unsigned char newId)
     GamePlayer& player = GetPlayer(newId);
     if(player.ps == PS_AI && player.aiInfo.type == AI::DUMMY)
         mainPlayer.sendMsgAsync(new GameMessage_Player_Swap(0xFF, newId));
+}
+
+void GameClient::UpdateFrameTime()
+{
+    auto frameTime =
+      std::chrono::duration_cast<FramesInfo::milliseconds32_t>(FramesInfo::UsedClock::now() - framesinfo.lastTime);
+    framesinfo.frameTime = min(frameTime, framesinfo.gf_length - FramesInfo::milliseconds32_t(1));
 }

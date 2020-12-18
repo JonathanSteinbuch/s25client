@@ -16,9 +16,11 @@
 // along with Return To The Roots. If not, see <http://www.gnu.org/licenses/>.
 
 #include "FrameCounter.h"
+#include "RTTR_Assert.h"
 #include "helpers/win32_nanosleep.h" // IWYU pragma: keep
 #include <algorithm>
 #include <cmath>
+#include <map>
 
 //-V:clock::time_point:813
 
@@ -53,7 +55,8 @@ unsigned FrameCounter::getCurFrameRate() const
 }
 
 FrameTimer::FrameTimer(int targetFramerate, unsigned maxLagFrames, clock::time_point curTime)
-    : targetFrameDuration_(duration_t::zero()), nextFrameTime_(curTime), maxLagFrames_(maxLagFrames)
+    : targetFrameDuration_(duration_t::zero()), maxLagFrames_(maxLagFrames), lastUpdateTime_(curTime),
+      nextFrameTime_(curTime), totalLagShift_(duration_t::zero())
 {
     setTargetFramerate(targetFramerate);
 }
@@ -61,17 +64,27 @@ FrameTimer::FrameTimer(int targetFramerate, unsigned maxLagFrames, clock::time_p
 void FrameTimer::setTargetFramerate(int targetFramerate)
 {
     using namespace std::chrono;
-    nextFrameTime_ -= targetFrameDuration_;
+    duration_t targetDuration;
     if(targetFramerate <= 0)
-        targetFrameDuration_ = duration_t::zero(); // Disabled
+        targetDuration = duration_t::zero(); // Disabled
     else
-        targetFrameDuration_ = duration_cast<duration_t>(seconds(1)) / std::min(targetFramerate, 200); // Max 200FPS
+        targetDuration = duration_cast<duration_t>(seconds(1)) / std::min(targetFramerate, 200); // Max 200FPS
+    setTargetFrameDuration(targetDuration);
+}
+
+void FrameTimer::setTargetFrameDuration(duration_t targetDuration)
+{
+    nextFrameTime_ -= targetFrameDuration_;
+
+    targetFrameDuration_ = targetDuration;
+
     nextFrameTime_ += targetFrameDuration_;
 }
 
 FrameTimer::duration_t FrameTimer::calcTimeToNextFrame(clock::time_point curTime) const
 {
     using namespace std::chrono;
+
     if(targetFrameDuration_ == duration_t::zero())
         return clock::duration::zero();
 
@@ -81,52 +94,138 @@ FrameTimer::duration_t FrameTimer::calcTimeToNextFrame(clock::time_point curTime
         return duration_t::zero();
 }
 
+FrameTimer::duration_t FrameTimer::calcTimeToNextFrame(clock::time_point curTime, int& framesBehindSchedule) const
+{
+    if(targetFrameDuration_ == duration_t::zero())
+    {
+        framesBehindSchedule = 0;
+
+        if(curTime - lastUpdateTime_ > std::chrono::milliseconds(33))
+        {
+            return lastUpdateTime_ - curTime;
+        }
+    } else
+    {
+        framesBehindSchedule = (curTime - nextFrameTime_) / targetFrameDuration_;
+    }
+
+    return calcTimeToNextFrame(curTime);
+}
+
 void FrameTimer::update(clock::time_point curTime)
 {
-    // Ideal: nextFrameTime == curTime -> Current frame is punctual
-    // Normal: nextFrameTime + x == curTime; -targetFrameDuration < x < targetFrameDuration (1 frame early to 1 frame
-    // late) Problem: The calculations can take long so every frame is late making nextFrameTime_ be further and further
+    // Ideal: nextFrameTime == startTime -> Current frame is punctual
+    // Normal: nextFrameTime + x == startTime; -targetFrameDuration < x < targetFrameDuration (1 frame early to 1 frame
+    // late) Problem: The calculations can take long so every frame is late making nextFrameTime be further and further
     // behind current time So even when changing the target we will never catch up -> Limit the time difference
-    if(nextFrameTime_ + maxLagFrames_ * targetFrameDuration_ < curTime)
+    if(lastUpdateTime_ + maxLagFrames_ * targetFrameDuration_ < curTime)
+    {
+        totalLagShift_ += curTime - nextFrameTime_;
         nextFrameTime_ = curTime;
-    else
+    } else
     {
         // Set the time for the next frame exactly 1 frame after the last
         // This way if the current frame was late, the next will be early and vice versa
         nextFrameTime_ += targetFrameDuration_;
     }
+
+    lastUpdateTime_ = curTime;
 }
 
-FrameLimiter::FrameLimiter() = default;
+FrameScheduler::FrameScheduler() = default;
 
-FrameLimiter::FrameLimiter(FrameTimer frameTimer) : frameTimer_(frameTimer) {}
-
-void FrameLimiter::setTargetFramerate(int targetFramerate)
+void ScheduledObject::setTargetFramerate(int targetFramerate)
 {
     frameTimer_.setTargetFramerate(targetFramerate);
 }
 
-void FrameLimiter::update(clock::time_point curTime)
+void ScheduledObject::update(clock::time_point curTime)
 {
     frameTimer_.update(curTime);
 }
 
-void FrameLimiter::sleepTillNextFrame(clock::time_point curTime)
+void ScheduledObject::setTargetFrameDuration(duration_t targetDuration)
 {
-    using namespace std::chrono;
-    nanoseconds waitTime = duration_cast<nanoseconds>(frameTimer_.calcTimeToNextFrame(curTime));
+    frameTimer_.setTargetFrameDuration(targetDuration);
+}
+
+void ScheduledObject::executeAndUpdate(clock::time_point curTime)
+{
+    this->Execute();
+    update(curTime);
+}
+
+void FrameScheduler::addScheduledTask(ScheduledObject* newTask, int targetFramerate)
+{
+    scheduledTasks_.push_back(newTask);
+    newTask->setTargetFramerate(targetFramerate);
+}
+
+void FrameScheduler::addScheduledTask(ScheduledObject* newTask, duration_t targetFrameDuration)
+{
+    scheduledTasks_.push_back(newTask);
+    newTask->setTargetFrameDuration(targetFrameDuration);
+}
+
+using namespace std::chrono;
+
+struct schedulingTime
+{
+public:
+    nanoseconds waitTime_;
+    ScheduledObject* scheduledTask_;
+    using clock = FrameTimer::clock;
+    int framesBehindSchedule_;
+
+    schedulingTime(ScheduledObject* scheduledTask, clock::time_point curTime) : scheduledTask_(scheduledTask)
+    {
+        waitTime_ = duration_cast<nanoseconds>(
+          scheduledTask_->getFrameTimer().calcTimeToNextFrame(curTime, framesBehindSchedule_));
+    }
+
+    bool operator<(const schedulingTime& other) const
+    {
+        if(waitTime_ < other.waitTime_)
+        {
+            return true;
+        } else if(waitTime_ == other.waitTime_)
+        {
+            return framesBehindSchedule_ > other.framesBehindSchedule_;
+        } else
+        {
+            return false;
+        }
+    }
+};
+
+void FrameScheduler::sleepTillNextFrame(clock::time_point curTime)
+{
+    std::vector<schedulingTime> waitTime;
+    for(auto& task : scheduledTasks_)
+    {
+        if(!task->IsPaused())
+            waitTime.emplace_back(task, curTime);
+    }
+
+    auto min_it = std::min_element(waitTime.begin(), waitTime.end());
+
     // No time to waste?
-    if(waitTime <= nanoseconds::zero())
-        return;
+    if(min_it->waitTime_ <= nanoseconds::zero())
+        min_it->scheduledTask_->executeAndUpdate(curTime);
 #ifdef _WIN32
-    if(waitTime < milliseconds(13)) // timer resolutions < 13ms do not work for windows correctly. TODO: Still true?
-        return;
+    else if(waitTime
+            < milliseconds(13)) // timer resolutions < 13ms do not work for windows correctly. TODO: Still true?
+        min_it->scheduledTask_->executeAndUpdate(curTime);
 #endif
+    else
+    {
+        timespec req;
+        req.tv_sec = static_cast<time_t>(duration_cast<seconds>(min_it->waitTime_).count());
+        req.tv_nsec = static_cast<long>((min_it->waitTime_ - seconds(req.tv_sec)).count());
 
-    timespec req;
-    req.tv_sec = static_cast<time_t>(duration_cast<seconds>(waitTime).count());
-    req.tv_nsec = static_cast<long>((waitTime - seconds(req.tv_sec)).count());
+        while(nanosleep(&req, &req) == -1)
+            continue;
 
-    while(nanosleep(&req, &req) == -1)
-        continue;
+        min_it->scheduledTask_->executeAndUpdate();
+    }
 }

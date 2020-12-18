@@ -281,7 +281,7 @@ void dskBenchmark::startTest(Test test)
     if(game_)
         gameView_ = std::make_unique<GameView>(game_->world_, VIDEODRIVER.GetRenderSize());
     VIDEODRIVER.GetRenderer()->synchronize();
-    VIDEODRIVER.setTargetFramerate(-1);
+    WINDOWMANAGER.setTargetFramerate(-1);
     curTest_ = test;
     frameCtr_ = FrameCounter(frameCtr_.getUpdateInterval());
 }
@@ -309,7 +309,7 @@ void dskBenchmark::finishTest()
     gameView_.reset();
     game_.reset();
     SetFpsDisplay(true);
-    VIDEODRIVER.setTargetFramerate(0);
+    WINDOWMANAGER.setTargetFramerate(0);
     if(!runAll_)
         curTest_ = TEST_NONE;
     else

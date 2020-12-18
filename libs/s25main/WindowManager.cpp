@@ -38,6 +38,7 @@
 #include "s25util/Log.h"
 #include "s25util/MyTime.h"
 #include <algorithm>
+#include "network/GameClient.h"
 
 WindowManager::WindowManager()
     : cursor_(Cursor::Hand), disable_mouse(false), lastMousePos(Position::Invalid()), curRenderSize(0, 0),
@@ -872,4 +873,19 @@ void WindowManager::DrawToolTip()
             ttPos.x = lastMousePos.x - leftSpacing - curTooltip->getWidth();
         curTooltip->draw(ttPos);
     }
+}
+
+void WindowManager::Execute() {
+	GAMECLIENT.UpdateFrameTime();
+   VIDEODRIVER.ClearScreen();
+   Draw();
+   VIDEODRIVER.SwapBuffers();
+}
+
+void WindowManager::setTargetFramerate(int target) {
+	ScheduledObject::setTargetFramerate(target);
+   if(target == 0)
+   	ScheduledObject::setTargetFramerate(VIDEODRIVER.setHwVSync(true));
+   else
+       VIDEODRIVER.setHwVSync(false);
 }

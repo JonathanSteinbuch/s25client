@@ -27,7 +27,8 @@ class AudioDriverWrapper;
 class WindowManager;
 
 /// "Die" GameManager-Klasse
-class GameManager
+class GameManager :
+	 public ScheduledObject
 {
 public:
     GameManager(Log& log, Settings& settings, VideoDriverWrapper& videoDriver, AudioDriverWrapper& audioDriver,
@@ -36,6 +37,8 @@ public:
     bool Start();
     void Stop();
     bool Run();
+
+    void Execute() override;
 
     bool ShowMenu();
 
@@ -54,6 +57,8 @@ private:
     AudioDriverWrapper& audioDriver_;
     WindowManager& windowManager_;
     FrameCounter gfCounter_;
+
+    FrameScheduler frameScheduler_;
 
     struct SkipReport
     {

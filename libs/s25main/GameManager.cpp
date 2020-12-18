@@ -65,8 +65,12 @@ bool GameManager::Start()
       settings_.video.fullscreen ? settings_.video.fullscreenSize : settings_.video.windowedSize; //-V807
     if(!videoDriver_.CreateScreen(screenSize, settings_.video.fullscreen))
         return false;
-    videoDriver_.setTargetFramerate(settings_.video.vsync);
     videoDriver_.SetMouseWarping(settings_.global.smartCursor);
+
+    // Schedule regular window manager execution
+    frameScheduler_.addScheduledTask(&windowManager_, settings_.video.vsync);
+    // Schedule Game client and server
+    frameScheduler_.addScheduledTask(this, GAMECLIENT.GetGFLength());
 
     /// Audiodriver laden
     if(!audioDriver_.LoadDriver(settings_.driver.audio))
@@ -106,10 +110,22 @@ void GameManager::Stop()
  */
 bool GameManager::Run()
 {
-    // Nachrichtenschleife
     if(!videoDriver_.Run())
         GLOBALVARS.notdone = false;
 
+    setTargetFrameDuration(GAMECLIENT.GetGFLength());
+    frameScheduler_.sleepTillNextFrame();
+
+    // Fenstermanager aufräumen
+    if(!GLOBALVARS.notdone)
+        windowManager_.CleanUp();
+
+    return GLOBALVARS.notdone;
+}
+
+void GameManager::Execute()
+{
+    // Nachrichtenschleife
     LOBBYCLIENT.Run();
 
     // Get this before the run so we know if we are currently skipping
@@ -119,6 +135,7 @@ bool GameManager::Run()
 
     if(targetSkipGF)
     {
+        WINDOWMANAGER.SetPause(true);
         // if we skip drawing write a comment every 5k gf
         unsigned current_time = videoDriver_.GetTickCount();
         const unsigned curGF = GAMECLIENT.GetGFNumber();
@@ -153,20 +170,10 @@ bool GameManager::Run()
             {
                 log_.write(_("jump to gf %1% complete\n")) % targetSkipGF;
             }
+            WINDOWMANAGER.SetPause(false);
         }
-    } else
-    {
-        videoDriver_.ClearScreen();
-        windowManager_.Draw();
-        videoDriver_.SwapBuffers();
     }
     gfCounter_.update();
-
-    // Fenstermanager aufräumen
-    if(!GLOBALVARS.notdone)
-        windowManager_.CleanUp();
-
-    return GLOBALVARS.notdone;
 }
 
 bool GameManager::ShowSplashscreen()

@@ -407,7 +407,7 @@ void dskOptions::Msg_Group_ComboSelectItem(const unsigned group_id, const unsign
             } else
                 SETTINGS.video.vsync = Settings::SCREEN_REFRESH_RATES[selection];
 
-            VIDEODRIVER.setTargetFramerate(SETTINGS.video.vsync);
+            WINDOWMANAGER.setTargetFramerate(SETTINGS.video.vsync);
             break;
         case 59: // Videotreiber
             SETTINGS.driver.video = combo->GetText(selection);

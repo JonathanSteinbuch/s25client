@@ -24,6 +24,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "FrameCounter.h"
 
 class Window;
 class Desktop;
@@ -43,7 +44,7 @@ enum class Cursor : unsigned
 };
 
 /// Verwaltet alle (offenen) Fenster bzw Desktops samt ihren Controls und Messages
-class WindowManager : public Singleton<WindowManager>, public VideoDriverLoaderInterface
+class WindowManager : public Singleton<WindowManager>, public VideoDriverLoaderInterface, public ScheduledObject
 {
 public:
     using KeyboardMsgHandler = bool (Window::*)(const KeyEvent&);
@@ -135,6 +136,11 @@ public:
     void SetCursor(Cursor cursor = Cursor::Hand);
     Cursor GetCursor() const { return cursor_; }
 
+    void Execute() override;
+
+    void setTargetFramerate(int target) override; //TODO ???
+
+
 private:
     class Tooltip;
 
@@ -163,6 +169,7 @@ private:
     // Für Doppelklick merken:
     unsigned lastLeftClickTime; /// Zeit des letzten Links-Klicks
     Position lastLeftClickPos;  /// Position beim letzten Links-Klick
+
 };
 
 #define WINDOWMANAGER WindowManager::inst()

@@ -18,6 +18,7 @@
 #include "Desktop.h"
 #include "Loader.h"
 #include "Settings.h"
+#include "WindowManager.h"
 #include "controls/ctrlText.h"
 #include "drivers/ScreenResizeEvent.h"
 #include "drivers/VideoDriverWrapper.h"
@@ -41,9 +42,9 @@ Desktop::Desktop(glArchivItem_Bitmap* background)
     SetFpsDisplay(true);
     // By default limit the maximum frame rate to 60 FPS
     if(SETTINGS.video.vsync < 0)
-        VIDEODRIVER.setTargetFramerate(60);
+        WINDOWMANAGER.setTargetFramerate(60);
     else
-        VIDEODRIVER.setTargetFramerate(SETTINGS.video.vsync);
+        WINDOWMANAGER.setTargetFramerate(SETTINGS.video.vsync);
     UpdateFps(VIDEODRIVER.GetFPS());
 }
 

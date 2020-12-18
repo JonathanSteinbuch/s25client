@@ -180,6 +180,8 @@ public:
 
     NetworkPlayer& GetMainPlayer() { return mainPlayer; }
 
+    void UpdateFrameTime();
+
 private:
     /// Create an AI player for the current world
     std::unique_ptr<AIPlayer> CreateAIPlayer(unsigned playerId, const AI::Info& aiInfo);

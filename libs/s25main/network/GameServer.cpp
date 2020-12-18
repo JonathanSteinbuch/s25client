@@ -588,9 +588,6 @@ void GameServer::ExecuteGameFrame()
     FramesInfo::milliseconds32_t passedTime =
       std::chrono::duration_cast<FramesInfo::milliseconds32_t>(currentTime - framesinfo.lastTime);
 
-    // prüfen ob GF vergangen
-    if(passedTime >= framesinfo.gf_length || skiptogf > currentGF)
-    {
         // NWF vergangen?
         if(currentGF == nwfInfo.getNextNWF())
         {
@@ -618,8 +615,7 @@ void GameServer::ExecuteGameFrame()
             passedTime = framesinfo.gf_length;
         else
             passedTime -= framesinfo.gf_length;
-        framesinfo.lastTime += passedTime;
-    }
+   //     framesinfo.lastTime += passedTime;
 }
 
 void GameServer::ExecuteNWF()

@@ -28,7 +28,6 @@
 class IVideoDriver;
 class IRenderer;
 class FrameCounter;
-class FrameLimiter;
 
 ///////////////////////////////////////////////////////////////////////////////
 // DriverWrapper
@@ -91,13 +90,13 @@ public:
     /// Get state of the modifier keys
     KeyEvent GetModKeyState() const;
 
+    //Set Hardware VSync if possible and returns vsync frame rate
+    int setHwVSync(bool enabled);
+
     // Nachrichtenschleife
     bool Run();
 
     unsigned GetTickCount();
-    /// Set framerate target (FPS)
-    /// negative for unlimited, 0 for hardware VSync
-    void setTargetFramerate(int target);
     unsigned GetFPS() const;
 
     std::string GetName() const;
@@ -105,10 +104,8 @@ public:
 
     /// Calculate the size of the texture which is optimal for the driver and at least minSize
     Extent calcPreferredTextureSize(const Extent& minSize) const;
-
 private:
     bool Initialize();
-    bool setHwVSync(bool enabled);
 
     // lädt eine Funktion aus den Extensions
     void* loadExtension(const std::string& extension);
@@ -122,7 +119,6 @@ private:
     Handle videodriver;
     std::unique_ptr<IRenderer> renderer_;
     std::unique_ptr<FrameCounter> frameCtr_;
-    std::unique_ptr<FrameLimiter> frameLimiter_;
     bool enableMouseWarping;
 
     std::vector<unsigned> texture_list;

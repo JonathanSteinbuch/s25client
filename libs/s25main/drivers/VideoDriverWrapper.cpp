@@ -16,7 +16,6 @@
 // along with Return To The Roots. If not, see <http://www.gnu.org/licenses/>.
 
 #include "VideoDriverWrapper.h"
-#include "FrameCounter.h"
 #include "RTTR_Version.h"
 #include "WindowManager.h"
 #include "driver/VideoInterface.h"
@@ -63,7 +62,6 @@ bool VideoDriverWrapper::Initialize()
     LOG.write(_("Loaded video driver \"%1%\"\n")) % GetName();
 
     frameCtr_ = std::make_unique<FrameCounter>();
-    frameLimiter_ = std::make_unique<FrameLimiter>();
 
     return true;
 }
@@ -196,13 +194,6 @@ bool VideoDriverWrapper::DestroyScreen()
     return true;
 }
 
-void VideoDriverWrapper::setTargetFramerate(int target)
-{
-    frameLimiter_->setTargetFramerate(target);
-    if(!setHwVSync(target == 0) && target == 0) // Fallback if no HW vsync but was requested
-        frameLimiter_->setTargetFramerate(60);
-}
-
 unsigned VideoDriverWrapper::GetFPS() const
 {
     return frameCtr_->getFrameRate();
@@ -272,10 +263,8 @@ void VideoDriverWrapper::SwapBuffers()
         s25util::fatal_error("No video driver selected!\n");
         return;
     }
-    frameLimiter_->sleepTillNextFrame(FrameCounter::clock::now());
     videodriver->SwapBuffers();
     FrameCounter::clock::time_point now = FrameCounter::clock::now();
-    frameLimiter_->update(now);
     frameCtr_->update(now);
 }
 
@@ -300,11 +289,11 @@ Extent VideoDriverWrapper::calcPreferredTextureSize(const Extent& minSize) const
     return Extent(helpers::roundToNextPowerOfTwo(minSize.x), helpers::roundToNextPowerOfTwo(minSize.y));
 }
 
-bool VideoDriverWrapper::setHwVSync(bool enabled)
+int VideoDriverWrapper::setHwVSync(bool enabled)
 {
-    if(!wglSwapIntervalEXT)
-        return false;
-    return wglSwapIntervalEXT(enabled ? 1 : 0) != 0;
+    if(!wglSwapIntervalEXT && enabled)
+        return 60;
+    return wglSwapIntervalEXT(enabled ? 1 : 0);
 }
 
 /**
