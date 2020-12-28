@@ -85,6 +85,8 @@ iwTools::iwTools(const GameWorldViewer& gwv, GameCommandFactory& gcFactory)
 
     toolSubscription =
       gwv.GetWorld().GetNotifications().subscribe<ToolNote>([this](auto) { this->shouldUpdateTexts = true; });
+
+    InitAfterCreate();
 }
 
 void iwTools::AddToolSettingSlider(unsigned id, GoodType ware)

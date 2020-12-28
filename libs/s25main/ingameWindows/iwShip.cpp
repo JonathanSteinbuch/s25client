@@ -74,6 +74,8 @@ iwShip::iwShip(GameWorldView& gwv, GameCommandFactory& gcFactory, const noShip* 
         AddImageButton(12 + rttr::enum_cast(dir), BUTTON_POS[dir], Extent(18, 18), TC_GREY,
                        LOADER.GetImageN("io", BUTTON_IDs[dir]))
           ->SetVisible(false);
+
+    InitAfterCreate();
 }
 
 void iwShip::Draw_()

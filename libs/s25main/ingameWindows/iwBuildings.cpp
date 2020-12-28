@@ -83,6 +83,8 @@ iwBuildings::iwBuildings(GameWorldView& gwv, GameCommandFactory& gcFactory)
     // Hilfe-Button
     Extent btSize = Extent(30, 32);
     AddImageButton(32, GetSize() - DrawPoint(14, 20) - btSize, btSize, TC_GREY, LOADER.GetImageN("io", 225), _("Help"));
+
+    InitAfterCreate();
 }
 
 /// Anzahlen der Gebäude zeichnen

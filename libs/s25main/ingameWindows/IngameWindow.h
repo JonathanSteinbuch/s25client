@@ -20,6 +20,7 @@
 #include "Window.h"
 #include <array>
 #include <vector>
+#include "gameData/const_gui_ids.h"
 
 class glArchivItem_Bitmap;
 class MouseCoords;
@@ -28,9 +29,6 @@ struct Point;
 
 class IngameWindow : public Window
 {
-    /// For each id we save the last position of the window
-    static std::vector<DrawPoint> last_pos;
-
 public:
     /// Special position that gets translated to the last know position or screen center when passed to the ctor
     static const DrawPoint posLastOrCenter;
@@ -45,6 +43,9 @@ public:
                  glArchivItem_Bitmap* background, bool modal = false, bool closeOnRightClick = true,
                  Window* parent = nullptr);
     ~IngameWindow() override;
+
+    
+    void InitAfterCreate();
 
     /// setzt den Hintergrund.
     void SetBackground(glArchivItem_Bitmap* background) { this->background = background; }
@@ -63,6 +64,8 @@ public:
     Extent GetIwSize() const;
     /// Get the current lower right corner of the content area
     DrawPoint GetRightBottomBoundary();
+
+    void SetPos(DrawPoint newPos);
 
     /// merkt das Fenster zum Schließen vor.
     void Close();
@@ -84,6 +87,8 @@ public:
     void MouseLeftDown(const MouseCoords& mc);
     void MouseLeftUp(const MouseCoords& mc);
     void MouseMove(const MouseCoords& mc);
+
+    GUI_ID GetID() const { return static_cast<GUI_ID>(Window::GetID()); }
 
 protected:
     void Draw_() override;

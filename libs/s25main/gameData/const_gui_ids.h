@@ -21,7 +21,7 @@
 
 constexpr unsigned MAX_OBSERVATION_WINDOWS = 50;
 
-enum GUI_ID
+enum GUI_ID : unsigned
 {
     CGI_ACTION = 0,
     CGI_CHAT,

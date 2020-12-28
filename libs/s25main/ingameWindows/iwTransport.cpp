@@ -90,6 +90,8 @@ iwTransport::iwTransport(const GameWorldViewer& gwv, GameCommandFactory& gcFacto
 
     // Netzwerk-Übertragungs-Timer
     AddTimer(7, 2000);
+
+    InitAfterCreate();
 }
 
 iwTransport::~iwTransport()

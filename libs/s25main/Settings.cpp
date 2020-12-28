@@ -16,6 +16,7 @@
 // along with Return To The Roots. If not, see <http://www.gnu.org/licenses/>.
 
 #include "Settings.h"
+#include "DrawPoint.h"
 #include "RTTR_Version.h"
 #include "RttrConfig.h"
 #include "drivers/AudioDriverWrapper.h"
@@ -23,6 +24,7 @@
 #include "files.h"
 #include "helpers/strUtils.h"
 #include "languages.h"
+#include "gameData/const_gui_ids.h"
 #include "libsiedler2/ArchivItem_Ini.h"
 #include "libsiedler2/ArchivItem_Text.h"
 #include "libsiedler2/libsiedler2.h"
@@ -30,6 +32,7 @@
 #include "s25util/System.h"
 #include "s25util/error.h"
 #include <boost/filesystem/operations.hpp>
+#include "ingameWindows/IngameWindows.h"
 
 const int Settings::VERSION = 13;
 const std::array<std::string, 11> Settings::SECTION_NAMES = {
@@ -136,6 +139,15 @@ void Settings::LoadDefaults()
     // ingame
     // {
     ingame.scale_statistics = false;
+    ingame.showBQ = false;
+    ingame.showNames = false;
+    ingame.showProductivity = false;
+    // }
+
+    //windows
+    // {
+    for(auto& id : persistentWindows)
+        windows.persistentSettings[id.first] = PersistentWindowSettings();
     // }
 
     // addons
@@ -152,7 +164,7 @@ void Settings::Load()
     const auto settingsPath = RTTRCONFIG.ExpandPath(s25::resources::config);
     try
     {
-        if(libsiedler2::Load(settingsPath, settings) != 0 || settings.size() != SECTION_NAMES.size())
+        if(libsiedler2::Load(settingsPath, settings) != 0 || settings.size() < SECTION_NAMES.size())
             throw std::runtime_error("File missing or invalid");
 
         const libsiedler2::ArchivItem_Ini* iniGlobal =
@@ -283,7 +295,24 @@ void Settings::Load()
         // ingame
         // {
         ingame.scale_statistics = (iniIngame->getValueI("scale_statistics") != 0);
+        ingame.showBQ = (iniIngame->getValueI("show_building_quality") != 0);
+        ingame.showNames = (iniIngame->getValueI("show_names") != 0);
+        ingame.showProductivity = (iniIngame->getValueI("show_productivity") != 0);
         // }
+
+        // ingame windows
+        for(auto & id : persistentWindows)
+        {
+            const libsiedler2::ArchivItem_Ini* iniWindow =
+              static_cast<libsiedler2::ArchivItem_Ini*>(settings.find(id.second));
+            if(!iniWindow)
+                continue;
+            windows.persistentSettings[id.first].lastPos.x = iniWindow->getValueI("pos_x");
+            windows.persistentSettings[id.first].lastPos.y = iniWindow->getValueI("pos_y");
+            windows.persistentSettings[id.first].isOpen = iniWindow->getValueI("is_open");
+            windows.persistentSettings[id.first].isMinimized = iniWindow->getValueI("is_minimized");
+            windows.persistentSettings[id.first].option = iniWindow->getValueI("option");
+        }
 
         // addons
         // {
@@ -311,9 +340,16 @@ void Settings::Load()
 void Settings::Save()
 {
     libsiedler2::Archiv settings;
-    settings.alloc(SECTION_NAMES.size());
-    for(unsigned i = 0; i < SECTION_NAMES.size(); ++i)
+    unsigned totalSize = SECTION_NAMES.size() + persistentWindows.size();
+    settings.alloc(totalSize);
+    unsigned i;
+    for(i=0; i < SECTION_NAMES.size(); ++i)
         settings.set(i, std::make_unique<libsiedler2::ArchivItem_Ini>(SECTION_NAMES[i]));
+    for(auto & id : persistentWindows)
+    {
+        settings.set(i, std::make_unique<libsiedler2::ArchivItem_Ini>(id.second));
+        i++;
+    }
 
     libsiedler2::ArchivItem_Ini* iniGlobal = static_cast<libsiedler2::ArchivItem_Ini*>(settings.find("global"));
     libsiedler2::ArchivItem_Ini* iniVideo = static_cast<libsiedler2::ArchivItem_Ini*>(settings.find("video"));
@@ -403,7 +439,24 @@ void Settings::Save()
     // ingame
     // {
     iniIngame->setValue("scale_statistics", (ingame.scale_statistics ? 1 : 0));
+    iniIngame->setValue("show_building_quality", (ingame.showBQ ? 1 : 0));
+    iniIngame->setValue("show_names", (ingame.showNames ? 1 : 0));
+    iniIngame->setValue("show_productivity", (ingame.showProductivity ? 1 : 0));
     // }
+
+    // ingame windows
+    for(auto & id : persistentWindows)
+    {
+        libsiedler2::ArchivItem_Ini* iniWindow =
+          static_cast<libsiedler2::ArchivItem_Ini*>(settings.find(id.second));
+        if(!iniWindow)
+            continue;
+        iniWindow->setValue("pos_x", windows.persistentSettings[id.first].lastPos.x);
+        iniWindow->setValue("pos_y", windows.persistentSettings[id.first].lastPos.y);
+        iniWindow->setValue("is_open", windows.persistentSettings[id.first].isOpen);
+        iniWindow->setValue("is_minimized", windows.persistentSettings[id.first].isMinimized);
+        iniWindow->setValue("option", windows.persistentSettings[id.first].option);
+    }
 
     // addons
     // {

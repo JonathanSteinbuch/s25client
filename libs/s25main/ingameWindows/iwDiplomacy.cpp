@@ -107,6 +107,8 @@ iwDiplomacy::iwDiplomacy(const GameWorldViewer& gwv, GameCommandFactory& gcFacto
     }
     // Farben festlegen
     Msg_PaintAfter();
+
+    InitAfterCreate();
 }
 
 void iwDiplomacy::Msg_PaintBefore()

@@ -23,4 +23,6 @@
 iwInventory::iwInventory(const GamePlayer& player)
     : iwWares(CGI_INVENTORY, IngameWindow::posLastOrCenter, Extent(167, 376), _("Stock"), false, SmallFont,
               player.GetInventory(), player)
-{}
+{
+    InitAfterCreate();
+}

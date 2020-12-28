@@ -24,6 +24,8 @@
 #include <array>
 #include <map>
 #include <string>
+#include <gameData/const_gui_ids.h>
+#include "DrawPoint.h"
 
 #undef interface
 
@@ -31,6 +33,19 @@ namespace validate {
 boost::optional<uint16_t> checkPort(const std::string& port);
 bool checkPort(int port);
 } // namespace validate
+
+struct PersistentWindowSettings
+{
+    DrawPoint lastPos;
+    bool isOpen;
+    bool isMinimized;
+    unsigned option;
+
+    PersistentWindowSettings(DrawPoint lastPos, bool isOpen, bool isMinimized, unsigned option)
+        : lastPos(lastPos), isOpen(isOpen), isMinimized(isMinimized), option(option)
+    {}
+    PersistentWindowSettings() : lastPos(DrawPoint::Invalid()), isOpen(false), isMinimized(false), option(0) {}
+};
 
 /// Configuration class
 class Settings : public Singleton<Settings, SingletonPolicies::WithLongevity>
@@ -109,7 +124,15 @@ public:
     struct
     {
         bool scale_statistics;
+        bool showNames;
+        bool showProductivity;
+        bool showBQ;
     } ingame;
+
+    struct
+    {
+        std::map<GUI_ID, PersistentWindowSettings> persistentSettings;
+    } windows;
 
     struct
     {

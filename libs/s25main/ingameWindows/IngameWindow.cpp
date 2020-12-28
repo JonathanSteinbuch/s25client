@@ -16,6 +16,7 @@
 // along with Return To The Roots. If not, see <http://www.gnu.org/licenses/>.
 
 #include "IngameWindow.h"
+#include "IngameWindows.h"
 #include "CollisionDetection.h"
 #include "Loader.h"
 #include "driver/MouseCoords.h"
@@ -28,8 +29,9 @@
 #include "gameData/const_gui_ids.h"
 #include <algorithm>
 #include <utility>
+#include "Settings.h"
+#include "helpers/containerUtils.h"
 
-std::vector<DrawPoint> IngameWindow::last_pos(CGI_NEXT + 1, DrawPoint::Invalid());
 const DrawPoint IngameWindow::posLastOrCenter(std::numeric_limits<DrawPoint::ElementType>::max(),
                                               std::numeric_limits<DrawPoint::ElementType>::max());
 const DrawPoint IngameWindow::posCenter(std::numeric_limits<DrawPoint::ElementType>::max() - 1,
@@ -44,6 +46,7 @@ IngameWindow::IngameWindow(unsigned id, const DrawPoint& pos, const Extent& size
       last_down(false), last_down2(false), isModal_(modal), closeme(false), isMinimized_(false), isMoving(false),
       closeOnRightClick_(closeOnRightClick)
 {
+
     std::fill(button_state.begin(), button_state.end(), BUTTON_UP);
     contentOffset.x = LOADER.GetImageN("resource", 38)->getWidth();     // left border
     contentOffset.y = LOADER.GetImageN("resource", 42)->getHeight();    // title bar
@@ -58,8 +61,9 @@ IngameWindow::IngameWindow(unsigned id, const DrawPoint& pos, const Extent& size
     // Load last position or center the window
     if(pos == posLastOrCenter)
     {
-        if(id < last_pos.size() && last_pos[id].isValid())
-            SetPos(last_pos[id]);
+        auto& settings = SETTINGS.windows.persistentSettings;
+        if(helpers::contains(persistentWindows, GetID()) && settings[GetID()].lastPos.isValid())
+            SetPos(settings[GetID()].lastPos);
         else
             MoveToCenter();
     } else if(pos == posCenter)
@@ -71,8 +75,18 @@ IngameWindow::IngameWindow(unsigned id, const DrawPoint& pos, const Extent& size
 IngameWindow::~IngameWindow()
 {
     // Possibly save our old position
-    if(GetID() < last_pos.size())
-        last_pos[GetID()] = GetPos();
+    if(helpers::contains(persistentWindows, GetID()))
+    {
+        SETTINGS.windows.persistentSettings[GetID()].lastPos = GetPos();
+        SETTINGS.windows.persistentSettings[GetID()].isMinimized = IsMinimized();
+        SETTINGS.windows.persistentSettings[GetID()].isOpen = !closeme;
+    }
+}
+
+void IngameWindow::InitAfterCreate()
+{
+    if(helpers::contains(persistentWindows, GetID()))
+        SetMinimized(SETTINGS.windows.persistentSettings[GetID()].isMinimized);
 }
 
 void IngameWindow::Resize(const Extent& newSize)
@@ -80,6 +94,7 @@ void IngameWindow::Resize(const Extent& newSize)
     DrawPoint iSize(newSize);
     iSize = elMax(DrawPoint(0, 0), iSize - DrawPoint(contentOffset + contentOffsetEnd));
     SetIwSize(Extent(iSize));
+    SetPos(GetPos());
 }
 
 void IngameWindow::SetIwSize(const Extent& newSize)
@@ -344,9 +359,16 @@ void IngameWindow::MoveNextToMouse()
 {
     // Center vertically and move slightly right
     DrawPoint newPos = VIDEODRIVER.GetMousePos() - DrawPoint(-20, GetSize().y / 2);
+    SetPos(newPos);
+}
+
+void IngameWindow::SetPos(DrawPoint newPos)
+{
     const Extent screenSize = VIDEODRIVER.GetRenderSize();
-    // To far right?
-    if(newPos.x + GetSize().x > screenSize.x)
+    // To far left or right?
+    if(newPos.x < 0)
+        newPos.x = 0;
+    else if(newPos.x + GetSize().x > screenSize.x)
         newPos.x = screenSize.x - GetSize().x;
 
     // To high or low?
@@ -354,7 +376,8 @@ void IngameWindow::MoveNextToMouse()
         newPos.y = 0;
     else if(newPos.y + GetSize().y > screenSize.y)
         newPos.y = screenSize.y - GetSize().y;
-    SetPos(newPos);
+  
+    Window::SetPos(newPos);
 }
 
 /// Weiterleitung von Nachrichten erlaubt oder nicht?

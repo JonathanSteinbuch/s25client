@@ -86,6 +86,8 @@ iwBuildingProductivities::iwBuildingProductivities(const GamePlayer& player)
     // Original S2 does not have a Help button in this window. Add it if you have something to say.
     // AddImageButton(500, GetSize().x - 14 - 30, GetSize().y - 20 - 32, 30, 32, TC_GREY, LOADER.GetImageN("io", 225),
     // _("Help"));
+
+    InitAfterCreate();
 }
 
 /// Aktualisieren der Prozente

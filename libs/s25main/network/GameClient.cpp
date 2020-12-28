@@ -33,6 +33,7 @@
 #include "Savegame.h"
 #include "SerializedGameData.h"
 #include "Settings.h"
+#include "addons/AddonEconomyModeGameLength.h"
 #include "addons/const_addons.h"
 #include "ai/AIPlayer.h"
 #include "drivers/VideoDriverWrapper.h"
@@ -325,6 +326,13 @@ void GameClient::StartGame(const unsigned random_init)
         }
         gameWorld.ConvertMineResourceTypes(Resource::Gold, target);
         gameWorld.PlaceAndFixWater();
+
+        if(game->ggs_.objective == GO_ECONOMYMODE)
+        {
+            unsigned int selection = game->ggs_.getSelection(AddonId::ECONOMY_MODE_GAME_LENGTH);
+            gameWorld.econHandler = std::make_unique<EconomyModeHandler>(
+              std::chrono::minutes(AddonEconomyModeGameLengthList[selection]) / GAMECLIENT.GetGFLength());
+        }
     }
     gameWorld.InitAfterLoad();
 

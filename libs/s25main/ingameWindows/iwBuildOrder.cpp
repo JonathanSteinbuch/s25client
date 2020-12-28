@@ -17,11 +17,15 @@
 
 #include "iwBuildOrder.h"
 #include "GamePlayer.h"
+#include "GlobalGameSettings.h"
 #include "Loader.h"
+#include "RTTR_Assert.h"
+#include "addons/const_addons.h"
 #include "controls/ctrlComboBox.h"
 #include "controls/ctrlImage.h"
 #include "controls/ctrlList.h"
 #include "network/GameClient.h"
+#include "world/GameWorldBase.h"
 #include "world/GameWorldViewer.h"
 #include "gameData/BuildingConsts.h"
 #include "gameData/const_gui_ids.h"
@@ -31,6 +35,8 @@ iwBuildOrder::iwBuildOrder(const GameWorldViewer& gwv)
                    LOADER.GetImageN("io", 5)),
       gwv(gwv), settings_changed(false)
 {
+    RTTR_Assert(gwv.GetWorld().GetGGS().isEnabled(AddonId::CUSTOM_BUILD_SEQUENCE));
+
     ctrlList* list = AddList(0, DrawPoint(15, 60), Extent(150, 220), TC_GREY, NormalFont);
 
     // Liste füllen
@@ -64,6 +70,8 @@ iwBuildOrder::iwBuildOrder(const GameWorldViewer& gwv)
     AddTimer(11, 2000);
 
     list->SetSelection(0);
+
+    InitAfterCreate();
 }
 
 iwBuildOrder::~iwBuildOrder()

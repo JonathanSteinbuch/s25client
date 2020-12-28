@@ -83,6 +83,8 @@ iwTrade::iwTrade(const nobBaseWarehouse& wh, const GameWorldViewer& gwv, GameCom
     // Choose wares at first
     box->SetSelection(0);
     Msg_ComboSelectItem(2, 0);
+
+    InitAfterCreate();
 }
 
 void iwTrade::Msg_PaintBefore()

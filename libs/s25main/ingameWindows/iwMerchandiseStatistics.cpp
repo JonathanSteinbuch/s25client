@@ -109,6 +109,8 @@ iwMerchandiseStatistics::iwMerchandiseStatistics(const GamePlayer& player)
     // Aktueller Maximalwert an der y-Achse
     maxValue = AddText(31, DrawPoint(211, 55), "1", MakeColor(255, 136, 96, 52),
                        FontStyle::RIGHT | FontStyle::VCENTER | FontStyle::NO_OUTLINE, NormalFont);
+
+    InitAfterCreate();
 }
 
 iwMerchandiseStatistics::~iwMerchandiseStatistics() = default;
@@ -155,6 +157,10 @@ void iwMerchandiseStatistics::Msg_OptionGroupChange(const unsigned ctrl_id, cons
 void iwMerchandiseStatistics::Draw_()
 {
     IngameWindow::Draw_();
+
+    if(IsMinimized())
+        return;
+
     DrawRectangles();
     DrawAxis();
     DrawStatistic();

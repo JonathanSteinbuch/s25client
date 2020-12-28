@@ -67,6 +67,8 @@ iwMilitary::iwMilitary(const GameWorldViewer& gwv, GameCommandFactory& gcFactory
     // Absendetimer, in 2s-Abschnitten wird jeweils das ganze als Netzwerknachricht ggf. abgeschickt
     AddTimer(22, 2000);
     UpdateSettings();
+
+    InitAfterCreate();
 }
 
 iwMilitary::~iwMilitary()

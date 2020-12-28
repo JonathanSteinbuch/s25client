@@ -87,6 +87,8 @@ iwDistribution::iwDistribution(const GameWorldViewer& gwv, GameCommandFactory& g
                    _("Default"));
 
     UpdateSettings();
+
+    InitAfterCreate();
 }
 
 iwDistribution::~iwDistribution()

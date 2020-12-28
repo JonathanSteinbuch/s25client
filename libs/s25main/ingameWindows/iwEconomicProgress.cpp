@@ -33,6 +33,8 @@
 #include "world/GameWorldBase.h"
 #include "world/GameWorldViewer.h"
 #include "gameData/const_gui_ids.h"
+#include "GlobalGameSettings.h"
+#include "RTTR_Assert.h"
 
 constexpr Extent wareIconSize(26, 26);
 constexpr unsigned txtBoxWidth = 63;
@@ -49,6 +51,7 @@ iwEconomicProgress::iwEconomicProgress(const GameWorldViewer& gwv)
 {
     const unsigned textcolor[] = {COLOR_GREEN, COLOR_YELLOW, COLOR_RED};
     const GameWorldBase& world = gwv.GetWorld();
+    RTTR_Assert(world.econHandler);
     EconomyModeHandler* eH = world.econHandler.get();
 
     // resize window
@@ -111,6 +114,8 @@ iwEconomicProgress::iwEconomicProgress(const GameWorldViewer& gwv)
     // help button
     AddImageButton(25, DrawPoint(padding1.x, this->GetSize().y - wareIconSize.y - padding2.y), wareIconSize, TC_GREY,
                    LOADER.GetImageN("io", 225), _("Help"));
+
+    InitAfterCreate();
 }
 
 iwEconomicProgress::~iwEconomicProgress() = default;
@@ -118,6 +123,9 @@ iwEconomicProgress::~iwEconomicProgress() = default;
 void iwEconomicProgress::Draw_()
 {
     IngameWindow::Draw_();
+
+    if(IsMinimized())
+        return;
 
     // draw team colors
     DrawPoint curTeamRectPos = GetDrawPos() + DrawPoint(padding1.x + wareIconSize.x + txtBoxWidth, padding1.y);

@@ -41,6 +41,8 @@ iwChat::iwChat(Window* parent)
 
     // Entspr. vom letzten Mal auswählen auswählen
     group->SetSelection(chat_dest);
+
+    InitAfterCreate();
 }
 
 void iwChat::Msg_PaintBefore()
