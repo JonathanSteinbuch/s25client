@@ -307,11 +307,17 @@ void Settings::Load()
               static_cast<libsiedler2::ArchivItem_Ini*>(settings.find(id.second));
             if(!iniWindow)
                 continue;
+            // Try to load values from Ini but if it fails just load defaults
+            try{
             windows.persistentSettings[id.first].lastPos.x = iniWindow->getValueI("pos_x");
             windows.persistentSettings[id.first].lastPos.y = iniWindow->getValueI("pos_y");
             windows.persistentSettings[id.first].isOpen = iniWindow->getValueI("is_open");
             windows.persistentSettings[id.first].isMinimized = iniWindow->getValueI("is_minimized");
             windows.persistentSettings[id.first].option = iniWindow->getValueI("option");
+            } catch(std::runtime_error& e)
+            {
+            	windows.persistentSettings[id.first] = PersistentWindowSettings();
+            }
         }
 
         // addons
